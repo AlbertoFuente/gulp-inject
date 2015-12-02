@@ -1,5 +1,6 @@
 'use strict';
 var extname = require('../extname');
+var fs = require('fs');
 
 /**
  * Constants
@@ -11,7 +12,7 @@ var DEFAULT_TARGET = TARGET_TYPES[0];
 /**
  * Transform module
  */
-var transform = module.exports = exports = function (filepath, i, length, sourceFile, targetFile) {
+var transform = module.exports = exports = function(filepath, i, length, sourceFile, targetFile, insertCode) {
   var type;
   if (targetFile && targetFile.path) {
     var ext = extname(targetFile.path);
@@ -35,8 +36,8 @@ transform.selfClosingTag = false;
 /**
  * Transform functions
  */
-TARGET_TYPES.forEach(function (targetType) {
-  transform[targetType] = function (filepath) {
+TARGET_TYPES.forEach(function(targetType) {
+  transform[targetType] = function(filepath) {
     var ext = extname(filepath);
     var type = typeFromExt(ext);
     var func = transform[targetType][type];
@@ -46,71 +47,75 @@ TARGET_TYPES.forEach(function (targetType) {
   };
 });
 
-transform.html.css = function (filepath) {
-  return '<link rel="stylesheet" href="' + filepath + '"' + end();
+function getFileContent(filepath) {
+  return fs.readFileSync('.' + filepath, 'utf8');
+}
+
+transform.html.css = function(filepath) {
+  return (arguments[5]) ? '<style>\n' + getFileContent(filepath) + '</style>' : '<link rel="stylesheet" href="' + filepath + '"' + end();
 };
 
-transform.html.js = function (filepath) {
-  return '<script src="' + filepath + '"></script>';
+transform.html.js = function(filepath) {
+  return (arguments[5]) ? '<script>\n' + getFileContent(filepath) + '</script>' : '<script src="' + filepath + '"></script>';
 };
 
-transform.html.jsx = function (filepath) {
+transform.html.jsx = function(filepath) {
   return '<script type="text/jsx" src="' + filepath + '"></script>';
 };
 
-transform.html.html = function (filepath) {
+transform.html.html = function(filepath) {
   return '<link rel="import" href="' + filepath + '"' + end();
 };
 
-transform.html.coffee = function (filepath) {
+transform.html.coffee = function(filepath) {
   return '<script type="text/coffeescript" src="' + filepath + '"></script>';
 };
 
-transform.html.image = function (filepath) {
+transform.html.image = function(filepath) {
   return '<img src="' + filepath + '"' + end();
 };
 
-transform.jade.css = function (filepath) {
+transform.jade.css = function(filepath) {
   return 'link(rel="stylesheet", href="' + filepath + '")';
 };
 
-transform.jade.js = function (filepath) {
+transform.jade.js = function(filepath) {
   return 'script(src="' + filepath + '")';
 };
 
-transform.jade.jade = function (filepath) {
+transform.jade.jade = function(filepath) {
   return 'include ' + filepath;
 };
 
-transform.jade.html = function (filepath) {
+transform.jade.html = function(filepath) {
   return 'link(rel="import", href="' + filepath + '")';
 };
 
-transform.jade.coffee = function (filepath) {
+transform.jade.coffee = function(filepath) {
   return 'script(type="text/coffeescript", src="' + filepath + '")';
 };
 
-transform.jade.image = function (filepath) {
+transform.jade.image = function(filepath) {
   return 'img(src="' + filepath + '")';
 };
 
-transform.slm.css = function (filepath) {
+transform.slm.css = function(filepath) {
   return 'link rel="stylesheet" href="' + filepath + '"';
 };
 
-transform.slm.js = function (filepath) {
+transform.slm.js = function(filepath) {
   return 'script src="' + filepath + '"';
 };
 
-transform.slm.html = function (filepath) {
+transform.slm.html = function(filepath) {
   return 'link rel="import" href="' + filepath + '"';
 };
 
-transform.slm.coffee = function (filepath) {
+transform.slm.coffee = function(filepath) {
   return 'script type="text/coffeescript" src="' + filepath + '"';
 };
 
-transform.slm.image = function (filepath) {
+transform.slm.image = function(filepath) {
   return 'img src="' + filepath + '"';
 };
 
@@ -124,33 +129,33 @@ transform.slim.coffee = transform.slm.coffee;
 
 transform.slim.image = transform.slm.image;
 
-transform.haml.css = function (filepath) {
+transform.haml.css = function(filepath) {
   return '%link{rel:"stylesheet", href:"' + filepath + '"}';
 };
 
-transform.haml.js = function (filepath) {
+transform.haml.js = function(filepath) {
   return '%script{src:"' + filepath + '"}';
 };
 
-transform.haml.html = function (filepath) {
+transform.haml.html = function(filepath) {
   return '%link{rel:"import", href:"' + filepath + '"}';
 };
 
-transform.haml.coffee = function (filepath) {
+transform.haml.coffee = function(filepath) {
   return '%script{type:"text/coffeescript", src:"' + filepath + '"}';
 };
 
-transform.haml.image = function (filepath) {
+transform.haml.image = function(filepath) {
   return '%img{src:"' + filepath + '"}';
 };
 
-transform.less.less = function (filepath) {
+transform.less.less = function(filepath) {
   return '@import "' + filepath + '";';
 };
 
 transform.less.css = transform.less.less;
 
-transform.sass.sass = function (filepath) {
+transform.sass.sass = function(filepath) {
   return '@import "' + filepath + '"';
 };
 
@@ -165,8 +170,8 @@ transform.scss.css = transform.scss.sass;
  * Transformations for jsx is like html
  * but always with self closing tags, invalid jsx otherwise
  */
-Object.keys(transform.html).forEach(function (type) {
-  transform.jsx[type] = function () {
+Object.keys(transform.html).forEach(function(type) {
+  transform.jsx[type] = function() {
     var originalOption = transform.selfClosingTag;
     transform.selfClosingTag = true;
     var result = transform.html[type].apply(transform.html, arguments);
@@ -175,11 +180,11 @@ Object.keys(transform.html).forEach(function (type) {
   };
 });
 
-function end () {
+function end() {
   return transform.selfClosingTag ? ' />' : '>';
 }
 
-function typeFromExt (ext) {
+function typeFromExt(ext) {
   ext = ext.toLowerCase();
   if (isImage(ext)) {
     return 'image';
@@ -187,11 +192,11 @@ function typeFromExt (ext) {
   return ext;
 }
 
-function isImage (ext) {
+function isImage(ext) {
   return IMAGES.indexOf(ext) > -1;
 }
 
-function isTargetType (type) {
+function isTargetType(type) {
   if (!type) {
     return false;
   }
